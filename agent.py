@@ -53,6 +53,65 @@ def _new_session(query: str, wardrobe: dict) -> dict:
     }
 
 
+# ── demo logging ─────────────────────────────────────────────────────────────
+
+SYSTEM_PROMPT = (
+    "You are FitFindr, a personal thrift-shopping assistant. "
+    "Given a user's search query, you extract their preferences, search secondhand listings, "
+    "suggest outfit combinations using their wardrobe, and generate a shareable fit card caption."
+)
+
+def _log_section(title: str) -> None:
+    print(f"\n{'━' * 60}")
+    print(f"  {title}")
+    print(f"{'━' * 60}")
+
+def _log_tool_call(tool_name: str, tool_args: dict) -> None:
+    print(f"  → Tool call: {tool_name}({json.dumps(tool_args)})")
+
+def _log_tool_result(result) -> None:
+    result_str = json.dumps(result) if not isinstance(result, str) else result
+    truncated = result_str[:200] + ("..." if len(result_str) > 200 else "")
+    print(f"  ← Result: {truncated}")
+
+def _log_session(session: dict) -> None:
+    print("  Session state:")
+    safe = {k: v for k, v in session.items() if k != "wardrobe"}
+    for key, value in safe.items():
+        if value is None or value == [] or value == {}:
+            print(f"    {key}: {value}")
+        elif isinstance(value, str):
+            preview = value[:120] + ("..." if len(value) > 120 else "")
+            print(f"    {key}: \"{preview}\"")
+        elif isinstance(value, list):
+            print(f"    {key}: [{len(value)} items]")
+        elif isinstance(value, dict):
+            print(f"    {key}: {json.dumps(value)[:120]}")
+        else:
+            print(f"    {key}: {value}")
+
+
+def dispatch_tool(tool_name: str, tool_args: dict):
+    """Route a tool call to the correct function, log it, and return the result."""
+    if not isinstance(tool_args, dict):
+        tool_args = {}
+    _log_tool_call(tool_name, tool_args)
+    if tool_name == "search_listings":
+        result = search_listings(
+            description=tool_args["description"],
+            size=tool_args.get("size"),
+            max_price=tool_args.get("max_price"),
+        )
+    elif tool_name == "suggest_outfit":
+        result = suggest_outfit(tool_args["new_item"], tool_args["wardrobe"])
+    elif tool_name == "create_fit_card":
+        result = create_fit_card(tool_args["outfit"], tool_args["new_item"])
+    else:
+        result = {"error": f"Unknown tool: {tool_name}"}
+    _log_tool_result(result)
+    return result
+
+
 # ── query parser ─────────────────────────────────────────────────────────────
 
 def _parse_query(query: str) -> dict:
@@ -137,16 +196,31 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     # Step 1: Initialize session
     session = _new_session(query, wardrobe)
 
+    _log_section("SYSTEM PROMPT")
+    print(f"  {SYSTEM_PROMPT}")
+
+    _log_section("USER QUERY")
+    print(f"  \"{query}\"")
+    print(f"  Wardrobe: {len(wardrobe.get('items', []))} items")
+
     # Step 2: Parse query → description, size, max_price
+    _log_section("STEP 2 — Parse query (LLM)")
     parsed = _parse_query(query)
     session["parsed"] = parsed
+    print(f"  Extracted: {json.dumps(parsed)}")
+    _log_session(session)
 
     description = parsed.get("description", query)
     size = parsed.get("size")
     max_price = parsed.get("max_price")
 
     # Step 3: Search listings — early return if nothing matches
-    results = search_listings(description=description, size=size, max_price=max_price)
+    _log_section("STEP 3 — search_listings")
+    results = dispatch_tool("search_listings", {
+        "description": description,
+        "size": size,
+        "max_price": max_price,
+    })
     session["search_results"] = results
 
     if not results:
@@ -159,18 +233,36 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             f"No listings found matching {' '.join(parts)}. "
             "Try loosening your price or size constraints."
         )
+        print(f"  ✗ No results — early exit")
+        _log_session(session)
         return session
 
+    print(f"  ✓ {len(results)} listing(s) matched")
+    _log_session(session)
+
     # Step 4: Select top result
+    _log_section("STEP 4 — Select top result")
     session["selected_item"] = results[0]
+    print(f"  Selected: \"{results[0]['title']}\" — ${results[0]['price']:.2f} on {results[0]['platform']}")
+    _log_session(session)
 
     # Step 5: Suggest outfit
-    session["outfit_suggestion"] = suggest_outfit(session["selected_item"], wardrobe)
+    _log_section("STEP 5 — suggest_outfit")
+    session["outfit_suggestion"] = dispatch_tool("suggest_outfit", {
+        "new_item": session["selected_item"],
+        "wardrobe": wardrobe,
+    })
+    _log_session(session)
 
     # Step 6: Create fit card
-    session["fit_card"] = create_fit_card(session["outfit_suggestion"], session["selected_item"])
+    _log_section("STEP 6 — create_fit_card")
+    session["fit_card"] = dispatch_tool("create_fit_card", {
+        "outfit": session["outfit_suggestion"],
+        "new_item": session["selected_item"],
+    })
+    _log_session(session)
 
-    # Step 7: Return completed session
+    _log_section("DONE")
     return session
 
 
