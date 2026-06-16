@@ -16,54 +16,71 @@ You must have at least 3 tools. The three required tools are listed — add any 
 
 **What it does:**
 <!-- Describe what this tool does in 1–2 sentences -->
+`This tool is used to search the mock listings dataset and return matching items for what the user has described.`
 
 **Input parameters:**
 <!-- List each parameter, its type, and what it represents -->
-- `description` (str): ...
-- `size` (str): ...
-- `max_price` (float): ...
+- `description` (str): `This represents a description of the clothing item user is looking for`
+- `size` (str): `This represents the size of clothing item the user is looking for and can be S, M, L, XL, or even a number or other formats`
+- `max_price` (float): `This is the maximum price of a clothing item a user is willing to pay for`
 
 **What it returns:**
 <!-- Describe the return value — what fields does a result contain? -->
+`This tool will return a list of dicts of clothing items. Each clothing item will have the following fields`
+
+`{
+    "id": "lst_001",
+    "title": "Vintage Levi's 501 Jeans — Medium Wash",
+    "description": "Classic 501s in a perfect medium wash. Some light fading at the knees which adds to the vintage look. No rips or stains.",
+    "category": "bottoms",
+    "style_tags": ["vintage", "classic", "denim", "streetwear"],
+    "size": "W30 L30",
+    "condition": "good",
+    "price": 38.00,
+    "colors": ["blue", "indigo"],
+    "brand": "Levi's",
+    "platform": "depop"
+}`
 
 **What happens if it fails or returns nothing:**
 <!-- What should the agent do if no listings match? -->
-
+`If there are no matching listings, the agent should return a message to the user saying "There are no listings that match 'description' of size 'size' under $'max_price'"`
 ---
 
 ### Tool 2: suggest_outfit
 
 **What it does:**
 <!-- Describe what this tool does in 1–2 sentences -->
-
+`This tool will take a users wardrobe in addition to a new clothing item and suggest one or more complete outfit combinations`
 **Input parameters:**
 <!-- List each parameter, its type, and what it represents -->
-- `new_item` (dict): ...
-- `wardrobe` (dict): ...
+- `new_item` (dict): `It represents a clothing item that can be returned from search_listings with multiple sub fields`
+- `wardrobe` (dict): `It represents the user's wardrobe with multiple pices of clothing`
 
 **What it returns:**
 <!-- Describe the return value -->
-
+`It will return a list of multiple clothing combinations that each makeup a full outfit from tops, bottoms, outerwear, shoes, and accessories.`
 **What happens if it fails or returns nothing:**
 <!-- What should the agent do if the wardrobe is empty or no outfit can be suggested? -->
-
+`If the wardrobe is empty, return a message to the user that the current wardrobe is empty aqnd the new item cannot be paired with anything. Suggest adding items to their wardrobe to expand it first`
 ---
 
 ### Tool 3: create_fit_card
 
 **What it does:**
 <!-- Describe what this tool does in 1–2 sentences -->
-
+`This tool generates a short, shareable description of a complete outfit — the kind of thing someone would caption an Instagram post with.`
 **Input parameters:**
 <!-- List each parameter, its type, and what it represents -->
-- `outfit` (...): ...
+- `outfit` (dict): `It represents a complete outfit combination that was created by the suggest_outfit tool`
+- `new_item` (dict): `It represents a clothing item that can be returned from search_listings with multiple sub fields`
 
 **What it returns:**
 <!-- Describe the return value -->
-
+`It should return a string value equivalent to a caption describing the complete outfit and emphasising the new item incorporated into the outfit`
 **What happens if it fails or returns nothing:**
 <!-- What should the agent do if the outfit data is incomplete? -->
-
+`If outfit data is incomplete, or tool call fails/returns nothing, return a message to the user informing them of that. Try to create a short description with the given clolothing items anyways `
 ---
 
 ### Additional Tools (if any)
